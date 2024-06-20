@@ -100,8 +100,166 @@ class Attention(nn.Module):
         )
         output = output.transpose(0, 2, 1, 3).reshape(B, L, -1)
         return self.out_proj(output)
+    
+class MLP(nn.Module):
+    def __init__(self, config: VisionConfig):
+        super().__init__()
+        self.activation_fn = nn.GELU(approx="fast")
+        self.fc1 = nn.Linear(config.hidden_size, config.intermediate_size)
+        self.fc2 = nn.Linear(config.intermediate_size, config.hidden_size)
+
+    def __call__(self, x: mx.array) -> mx.array:
+        x = self.activation_fn(self.fc1(x))
+        x = self.fc2(x)
+        return x
+    
+class EncoderLayer(nn.Module):
+    def __init__(self, config: VisionConfig):
+        super().__init__()
+        self.embed_dim = config.hidden_size
+        self.self_attn = Attention(
+            config.hidden_size, config.num_attention_heads, bias=True
+        )
+        self.layer_norm1 = nn.LayerNorm(self.embed_dim, eps=config.layer_norm_eps)
+        self.mlp = MLP(config)
+        self.layer_norm2 = nn.LayerNorm(self.embed_dim, eps=config.layer_norm_eps)
+
+    def __call__(self, x: mx.array, mask: Optional[mx.array] = None) -> mx.array:
+        y = self.layer_norm1(x)
+        y = self.self_attn(y, y, y, mask)
+        x = x + y
+        y = self.layer_norm2(x)
+        y = self.mlp(y)
+        return x + y    
+
+class Encoder(nn.Module):
+    def __init__(self, config: VisionConfig):
+        super().__init__()
+        self.layers = [EncoderLayer(config) for _ in range(config.num_hidden_layers)]
 
 
+class VisionEmbeddings(nn.Module):
+    def __init__(self, config: VisionConfig):
+        super().__init__()
+        self.config = config
+        self.embed_dim = config.hidden_size
+        self.image_size = config.image_size
+        self.patch_size = config.patch_size
+
+        self.patch_embedding = nn.Conv2d(
+            in_channels=config.num_channels,
+            out_channels=self.embed_dim,
+            kernel_size=self.patch_size,
+            stride=self.patch_size,
+            bias=True,
+        )
+
+        self.num_patches = (self.image_size // self.patch_size) ** 2
+        self.num_positions = self.num_patches
+        self.position_embedding = nn.Embedding(self.num_positions, self.embed_dim)
+
+    def __call__(self, x: mx.array) -> mx.array:
+        batch_size = x.shape[0]
+        patch_embeddings = self.patch_embedding(x)
+        patch_embeddings = mx.flatten(patch_embeddings, start_axis=1, end_axis=2)
+        self.position_ids = mx.array(np.arange(self.num_positions)[None, :])
+        embeddings = patch_embeddings
+        embeddings += self.position_embedding(self.position_ids)
+        return embeddings
+
+
+
+class VisionModel(nn.Module):
+    def __init__(self, config: VisionConfig):
+        super().__init__()
+        self.model_type = config.model_type
+        if self.model_type != "siglip_vision_model":
+            raise ValueError(f"Unsupported model type: {self.model_type}")
+
+        self.vision_model = SigLipVisionModel(config)
+
+    def __call__(
+        self, x: mx.array, output_hidden_states: Optional[bool] = None
+    ) -> mx.array:
+        return self.vision_model(x, output_hidden_states)
+
+    def sanitize(self, weights):
+        sanitized_weights = {}
+        for k, v in weights.items():
+            if "position_ids" in k:
+                # Remove unused position_ids
+                continue
+            elif "patch_embedding.weight" in k:
+                # PyTorch conv2d weight tensors have shape:
+                #   [out_channels, in_channels, kH, KW]
+                # MLX conv2d expects the weight be of shape:
+                #   [out_channels, kH, KW, in_channels]
+                if check_array_shape(v):
+                    sanitized_weights[k] = v
+                else:
+                    sanitized_weights[k] = v.transpose(0, 2, 3, 1)
+            else:
+                sanitized_weights[k] = v
+
+        return sanitized_weights
+    
+
+#  TODO: common with paligemma
+class SigLipVisionModel(nn.Module):
+    def __init__(self, config: VisionConfig):
+        super().__init__()
+        self.embeddings = VisionEmbeddings(config)
+        self.encoder = Encoder(config)
+        self.post_layernorm = nn.LayerNorm(config.hidden_size)
+        self.head = SigLipMultiheadAttentionPoolingHead(config)
+
+    def __call__(
+        self,
+        x: mx.array,
+        output_hidden_states: Optional[bool] = None,
+    ) -> mx.array:
+        x = self.embeddings(x)
+
+        encoder_states = (x,) if output_hidden_states else None
+
+        for l in self.encoder.layers:
+            x = l(x, mask=None)
+            if output_hidden_states:
+                encoder_states = encoder_states + (x,)
+
+        pooler_output = self.post_layernorm(x[:, 0, :])
+        pooler_output = self.head(pooler_output)
+        return pooler_output, x, encoder_states
+
+#  TODO: specific for this model
+class SigLipMultiheadAttentionPoolingHead(nn.Module):
+
+    def __init__(self, config: VisionConfig):
+        super().__init__()
+
+        self.probe = mx.ones(
+            (
+                1,
+                1,
+                config.hidden_size,
+            )
+        )
+        self.attention = MHA(
+            config.hidden_size, num_heads=config.num_attention_heads, bias=True
+        )
+        self.layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.mlp = MLP(config)
+
+    def __call__(self, x: mx.array):
+        x = self.attention(self.probe, x)[0]
+
+        residual = x
+        x = self.layernorm(x)
+        x = residual + self.mlp(x)
+
+        return x[:, 0]
+
+# specific for this model
 class MHA(nn.Module):
     def __init__(
         self,
@@ -143,161 +301,3 @@ class MHA(nn.Module):
         output = output.transpose(0, 2, 1, 3).reshape(B, L, -1)
         return self.out_proj(output)
 
-
-class MLP(nn.Module):
-    def __init__(self, config: VisionConfig):
-        super().__init__()
-        self.activation_fn = nn.GELU(approx="fast")
-        self.fc1 = nn.Linear(config.hidden_size, config.intermediate_size)
-        self.fc2 = nn.Linear(config.intermediate_size, config.hidden_size)
-
-    def __call__(self, x: mx.array) -> mx.array:
-        x = self.activation_fn(self.fc1(x))
-        x = self.fc2(x)
-        return x
-
-
-class EncoderLayer(nn.Module):
-    def __init__(self, config: VisionConfig):
-        super().__init__()
-        self.embed_dim = config.hidden_size
-        self.self_attn = Attention(
-            config.hidden_size, config.num_attention_heads, bias=True
-        )
-        self.layer_norm1 = nn.LayerNorm(self.embed_dim, eps=config.layer_norm_eps)
-        self.mlp = MLP(config)
-        self.layer_norm2 = nn.LayerNorm(self.embed_dim, eps=config.layer_norm_eps)
-
-    def __call__(self, x: mx.array, mask: Optional[mx.array] = None) -> mx.array:
-        y = self.layer_norm1(x)
-        y = self.self_attn(y, y, y, mask)
-        x = x + y
-        y = self.layer_norm2(x)
-        y = self.mlp(y)
-        return x + y
-
-
-class Encoder(nn.Module):
-    def __init__(self, config: VisionConfig):
-        super().__init__()
-        self.layers = [EncoderLayer(config) for _ in range(config.num_hidden_layers)]
-
-
-class VisionEmbeddings(nn.Module):
-    def __init__(self, config: VisionConfig):
-        super().__init__()
-        self.config = config
-        self.embed_dim = config.hidden_size
-        self.image_size = config.image_size
-        self.patch_size = config.patch_size
-
-        self.patch_embedding = nn.Conv2d(
-            in_channels=config.num_channels,
-            out_channels=self.embed_dim,
-            kernel_size=self.patch_size,
-            stride=self.patch_size,
-            bias=True,
-        )
-
-        self.num_patches = (self.image_size // self.patch_size) ** 2
-        self.num_positions = self.num_patches
-        self.position_embedding = nn.Embedding(self.num_positions, self.embed_dim)
-
-    def __call__(self, x: mx.array) -> mx.array:
-        batch_size = x.shape[0]
-        patch_embeddings = self.patch_embedding(x)
-        patch_embeddings = mx.flatten(patch_embeddings, start_axis=1, end_axis=2)
-        self.position_ids = mx.array(np.arange(self.num_positions)[None, :])
-        embeddings = patch_embeddings
-        embeddings += self.position_embedding(self.position_ids)
-        return embeddings
-
-
-class SigLipVisionModel(nn.Module):
-    def __init__(self, config: VisionConfig):
-        super().__init__()
-        self.embeddings = VisionEmbeddings(config)
-        self.encoder = Encoder(config)
-        self.post_layernorm = nn.LayerNorm(config.hidden_size)
-        self.head = SigLipMultiheadAttentionPoolingHead(config)
-
-    def __call__(
-        self,
-        x: mx.array,
-        output_hidden_states: Optional[bool] = None,
-    ) -> mx.array:
-        x = self.embeddings(x)
-
-        encoder_states = (x,) if output_hidden_states else None
-
-        for l in self.encoder.layers:
-            x = l(x, mask=None)
-            if output_hidden_states:
-                encoder_states = encoder_states + (x,)
-
-        pooler_output = self.post_layernorm(x[:, 0, :])
-        pooler_output = self.head(pooler_output)
-        return pooler_output, x, encoder_states
-
-
-class SigLipMultiheadAttentionPoolingHead(nn.Module):
-
-    def __init__(self, config: VisionConfig):
-        super().__init__()
-
-        self.probe = mx.ones(
-            (
-                1,
-                1,
-                config.hidden_size,
-            )
-        )
-        self.attention = MHA(
-            config.hidden_size, num_heads=config.num_attention_heads, bias=True
-        )
-        self.layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
-        self.mlp = MLP(config)
-
-    def __call__(self, x: mx.array):
-        x = self.attention(self.probe, x)[0]
-
-        residual = x
-        x = self.layernorm(x)
-        x = residual + self.mlp(x)
-
-        return x[:, 0]
-
-
-class VisionModel(nn.Module):
-    def __init__(self, config: VisionConfig):
-        super().__init__()
-        self.model_type = config.model_type
-        if self.model_type != "siglip_vision_model":
-            raise ValueError(f"Unsupported model type: {self.model_type}")
-
-        self.vision_model = SigLipVisionModel(config)
-
-    def __call__(
-        self, x: mx.array, output_hidden_states: Optional[bool] = None
-    ) -> mx.array:
-        return self.vision_model(x, output_hidden_states)
-
-    def sanitize(self, weights):
-        sanitized_weights = {}
-        for k, v in weights.items():
-            if "position_ids" in k:
-                # Remove unused position_ids
-                continue
-            elif "patch_embedding.weight" in k:
-                # PyTorch conv2d weight tensors have shape:
-                #   [out_channels, in_channels, kH, KW]
-                # MLX conv2d expects the weight be of shape:
-                #   [out_channels, kH, KW, in_channels]
-                if check_array_shape(v):
-                    sanitized_weights[k] = v
-                else:
-                    sanitized_weights[k] = v.transpose(0, 2, 3, 1)
-            else:
-                sanitized_weights[k] = v
-
-        return sanitized_weights

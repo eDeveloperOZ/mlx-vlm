@@ -29,17 +29,6 @@ class TextConfig:
             }
         )
 
-
-class RMSNorm(nn.Module):
-    def __init__(self, dims: int, eps: float = 1e-6):
-        super().__init__()
-        self.weight = mx.ones((dims,))
-        self.eps = eps
-
-    def __call__(self, x):
-        return mx.fast.rms_norm(x, 1.0 + self.weight, self.eps)
-
-
 class Attention(nn.Module):
     def __init__(self, args: TextConfig):
         super().__init__()
@@ -92,6 +81,16 @@ class Attention(nn.Module):
         )
         output = output.transpose(0, 2, 1, 3).reshape(B, L, -1)
         return self.o_proj(output), (keys, values)
+
+class RMSNorm(nn.Module):
+    def __init__(self, dims: int, eps: float = 1e-6):
+        super().__init__()
+        self.weight = mx.ones((dims,))
+        self.eps = eps
+
+    def __call__(self, x):
+        return mx.fast.rms_norm(x, 1.0 + self.weight, self.eps)
+
 
 
 class MLP(nn.Module):

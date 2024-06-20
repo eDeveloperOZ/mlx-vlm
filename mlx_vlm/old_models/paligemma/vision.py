@@ -14,9 +14,9 @@ class VisionConfig:
     hidden_size: int
     intermediate_size: int
     num_attention_heads: int
+    image_size: int = 224
     patch_size: int
     projection_dim: int
-    image_size: int = 224
     num_channels: int = 3
     layer_norm_eps: float = 1e-6
 
@@ -101,19 +101,6 @@ class Attention(nn.Module):
         return self.out_proj(output)
 
 
-class FastGELUActivation(nn.Module):
-    """
-    Applies GELU approximation that is slower than QuickGELU but more accurate. See: https://github.com/hendrycks/GELUs
-    """
-
-    def __call__(self, input: mx.array) -> mx.array:
-        return (
-            0.5
-            * input
-            * (1.0 + mx.tanh(np.sqrt(2 / np.pi) * (input + 0.044715 * (input**3))))
-        )
-
-
 class MLP(nn.Module):
     def __init__(self, config: VisionConfig):
         super().__init__()
@@ -126,7 +113,6 @@ class MLP(nn.Module):
         x = self.activation_fn(x)
         x = self.fc2(x)
         return x
-
 
 class EncoderLayer(nn.Module):
     def __init__(self, config: VisionConfig):
@@ -144,7 +130,6 @@ class EncoderLayer(nn.Module):
         h = x + r
         r = self.mlp(self.layer_norm2(h))
         return h + r
-
 
 class Encoder(nn.Module):
     def __init__(self, config: VisionConfig):
@@ -197,29 +182,6 @@ class VisionEmbeddings(nn.Module):
         return embeddings
 
 
-class SigLipVisionModel(nn.Module):
-    def __init__(self, config: VisionConfig):
-        super().__init__()
-        self.embeddings = VisionEmbeddings(config)
-        self.encoder = Encoder(config)
-        self.post_layernorm = nn.LayerNorm(config.hidden_size)
-
-    def __call__(
-        self,
-        x: mx.array,
-        output_hidden_states: Optional[bool] = None,
-    ) -> mx.array:
-        x = self.embeddings(x)
-
-        encoder_outputs = self.encoder(
-            x=x, output_hidden_states=output_hidden_states, mask=None
-        )
-
-        pooler_output = self.post_layernorm(encoder_outputs[0])
-
-        return pooler_output, x, encoder_outputs[-1]
-
-
 class VisionModel(nn.Module):
     def __init__(self, config: VisionConfig):
         super().__init__()
@@ -253,3 +215,41 @@ class VisionModel(nn.Module):
                 sanitized_weights[k] = v
 
         return sanitized_weights
+    
+
+#  TODO: specific for this model
+class FastGELUActivation(nn.Module):
+    """
+    Applies GELU approximation that is slower than QuickGELU but more accurate. See: https://github.com/hendrycks/GELUs
+    """
+
+    def __call__(self, input: mx.array) -> mx.array:
+        return (
+            0.5
+            * input
+            * (1.0 + mx.tanh(np.sqrt(2 / np.pi) * (input + 0.044715 * (input**3))))
+        )
+    
+# TODO: coomon with nanoLlava 
+class SigLipVisionModel(nn.Module):
+    def __init__(self, config: VisionConfig):
+        super().__init__()
+        self.embeddings = VisionEmbeddings(config)
+        self.encoder = Encoder(config)
+        self.post_layernorm = nn.LayerNorm(config.hidden_size)
+
+    def __call__(
+        self,
+        x: mx.array,
+        output_hidden_states: Optional[bool] = None,
+    ) -> mx.array:
+        x = self.embeddings(x)
+
+        encoder_outputs = self.encoder(
+            x=x, output_hidden_states=output_hidden_states, mask=None
+        )
+
+        pooler_output = self.post_layernorm(encoder_outputs[0])
+
+        return pooler_output, x, encoder_outputs[-1]
+

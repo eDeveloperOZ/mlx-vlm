@@ -103,7 +103,6 @@ class Attention(nn.Module):
 
         return self.out_proj(output)
 
-
 class MLP(nn.Module):
     def __init__(self, config: VisionConfig):
         super().__init__()
@@ -180,33 +179,6 @@ class VisionEmbeddings(nn.Module):
         return embeddings
 
 
-class ClipVisionModel(nn.Module):
-    def __init__(self, config: VisionConfig):
-        super().__init__()
-        self.embeddings = VisionEmbeddings(config)
-        self.pre_layrnorm = nn.LayerNorm(config.hidden_size)
-        self.encoder = Encoder(config)
-        self.post_layernorm = nn.LayerNorm(config.hidden_size)
-
-    def __call__(
-        self,
-        x: mx.array,
-        output_hidden_states: Optional[bool] = None,
-    ) -> mx.array:
-        x = self.embeddings(x)
-        x = self.pre_layrnorm(x)
-
-        encoder_states = (x,) if output_hidden_states else None
-
-        for l in self.encoder.layers:
-            x = l(x, mask=None)
-            if output_hidden_states:
-                encoder_states = encoder_states + (x,)
-
-        pooler_output = self.post_layernorm(x[:, 0, :])
-        return pooler_output, x, encoder_states
-
-
 class VisionModel(nn.Module):
     def __init__(self, config: VisionConfig):
         super().__init__()
@@ -241,3 +213,32 @@ class VisionModel(nn.Module):
                 sanitized_weights[k] = v
 
         return sanitized_weights
+    
+
+#  TODO: not in common for all models
+class ClipVisionModel(nn.Module):
+    def __init__(self, config: VisionConfig):
+        super().__init__()
+        self.embeddings = VisionEmbeddings(config)
+        self.pre_layrnorm = nn.LayerNorm(config.hidden_size)
+        self.encoder = Encoder(config)
+        self.post_layernorm = nn.LayerNorm(config.hidden_size)
+
+    def __call__(
+        self,
+        x: mx.array,
+        output_hidden_states: Optional[bool] = None,
+    ) -> mx.array:
+        x = self.embeddings(x)
+        x = self.pre_layrnorm(x)
+
+        encoder_states = (x,) if output_hidden_states else None
+
+        for l in self.encoder.layers:
+            x = l(x, mask=None)
+            if output_hidden_states:
+                encoder_states = encoder_states + (x,)
+
+        pooler_output = self.post_layernorm(x[:, 0, :])
+        return pooler_output, x, encoder_states
+

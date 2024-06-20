@@ -10,9 +10,9 @@ import numpy as np
 @dataclass
 class VisionConfig:
     model_type: str
+    num_hidden_layers: int
     hidden_size: int
     intermediate_size: int
-    num_hidden_layers: int
     num_attention_heads: int
     image_size: int
     patch_size: int
@@ -97,7 +97,6 @@ class Attention(nn.Module):
         )
         output = output.transpose(0, 2, 1, 3).reshape(B, L, -1)
         return self.out_proj(output)
-
 
 class MLP(nn.Module):
     def __init__(self, config: VisionConfig):

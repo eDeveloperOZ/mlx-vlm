@@ -24,7 +24,7 @@ from transformers import (
     PreTrainedTokenizerFast,
 )
 
-from .models.base import BaseImageProcessor
+from .old_models.base import BaseImageProcessor
 from .sample_utils import top_p_sampling
 from .tokenizer_utils import load_tokenizer
 
