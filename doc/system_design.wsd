@@ -1,0 +1,63 @@
+@startuml
+title System Design
+skinparam titleFontSize 36 
+
+package Models {
+    interface ModelInterface {}
+
+    abstract class BaseModel {}
+
+    abstract VisionInterface {}
+
+    abstract LanguageInterface {}
+
+    class Idefics2 {}
+
+    class Llava {}
+
+    class NanoLlava {}
+
+    BaseModel --> VisionInterface: HAS A
+    BaseModel --> LanguageInterface: HAS A
+
+    ModelInterface <|.. BaseModel: IMPLEMENTS
+    BaseModel <|-- Idefics2: IS A
+    BaseModel <|-- Llava: IS A 
+    BaseModel <|-- NanoLlava: IS A
+}
+
+package MediaEngine {
+    interface MediaEngineInterface {}
+
+    abstract class BaseImageProcessor {}
+
+    class SingleImageMediaEngine {}
+
+    class BatchImageMediaEngine {}
+
+    class VideoMediaEngine {}
+
+    BaseImageProcessor <|-- SingleImageMediaEngine: IS A
+    BaseImageProcessor <|-- BatchImageMediaEngine: IS A
+    BaseImageProcessor <|-- VideoMediaEngine: IS A
+    MediaEngineInterface <-- BaseImageProcessor: IMPLEMENTS
+}
+
+package EntryPoint {
+    abstract class EntryPoint {}
+    
+    class ChatUI {}
+
+    class CLI {}
+
+    class API {}
+
+    EntryPoint <|-- ChatUI: IS A
+    EntryPoint <|-- CLI: IS A
+    EntryPoint <|-- API: IS A
+
+    EntryPoint --> MediaEngineInterface: CREATES
+    EntryPoint --> ModelInterface: CREATES
+}
+
+@enduml

@@ -168,10 +168,12 @@ python -m mlx_vlm.convert --hf-path <local_dir> --mlx-path <mlx_dir>
 
     model_config.text_config = model_class.TextConfig.from_dict(config["text_config"])
 
+    # TODO: handle model condig for the idefics2 when implementing the model
     if hasattr(model_config, "perceiver_config"):
         model_config.perceiver_config = model_class.PerceiverConfig.from_dict(
             config["perceiver_config"]
         )
+    # TODO: handle model config for the multi_mosality when implementing the model
     if hasattr(model_config, "aligner_config"):
         model_config.aligner_config = model_class.AlignerConfig.from_dict(
             config["aligner_config"]
@@ -179,9 +181,11 @@ python -m mlx_vlm.convert --hf-path <local_dir> --mlx-path <mlx_dir>
 
     model = model_class.Model(model_config)
 
+    # TODO: handle model config for the nanoLlava and paligemma and llava maybe idefics2 when implementing the model
     if hasattr(model, "sanitize"):
         weights = model.sanitize(weights)
 
+    # TODO: handle model config for the idefics2 and llava when implementing the model
     if hasattr(model_class.VisionModel, "sanitize"):
         weights = model_class.VisionModel(model_config.vision_config).sanitize(
             weights=weights

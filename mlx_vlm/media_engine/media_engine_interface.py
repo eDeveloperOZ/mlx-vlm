@@ -1,7 +1,15 @@
+from abc import ABC, abstractmethod
+from typing import Any
 
-class MediaEngineInterface:
-    def __init__(self, config):
-        self.config = config
+from ..core.error_handler import ErrorHandler
+from ..core.logger import Logger
 
-    def load_weights(self, weights_path):
-        pass
+logger = Logger()
+
+class MediaEngineInterface(ABC):
+    def __init__(self):
+        self.error_handler = ErrorHandler(logger)
+
+    @abstractmethod
+    def process(self, input: Any) -> Any:
+        raise NotImplementedError("Subclass must implement this method")
