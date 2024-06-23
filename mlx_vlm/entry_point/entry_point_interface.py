@@ -8,10 +8,11 @@ from mlx_vlm.core.tokenizer import Tokenizer
 from mlx_vlm.media_engine.media_engine_interface import MediaEngineInterface
 from mlx_vlm.models.base_model.model_interface import ModelInterface     
 
-class EntryPointInterface:
+class EntryPointInterface():
     def __init__(self):
         self.args = parse_arguments()
-        self.tokenizer = Tokenizer()
+        self.model_path = self.get_model_path(self.args.model)
+        self.tokenizer = Tokenizer(self.model_path)
 
     @abstractmethod
     def initMediaEngine(self) -> MediaEngineInterface:

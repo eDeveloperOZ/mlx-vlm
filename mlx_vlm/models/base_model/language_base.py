@@ -9,13 +9,13 @@ import numpy as np
 
 @dataclass
 class LanguageConfig:
-    model_type: str
-    hidden_size: int
-    num_hidden_layers: int
-    intermediate_size: int
-    num_attention_heads: int
-    max_position_embeddings: int
-    vocab_size: int
+    model_type: str = "default"
+    hidden_size: int = 768
+    num_hidden_layers: int = 12
+    intermediate_size: int = 3072
+    num_attention_heads: int = 12
+    max_position_embeddings: int = 512
+    vocab_size: int = 30522
     num_key_value_heads: Optional[int] = None
     rms_norm_eps: float = 1e-6
     rope_theta: float = 10000
@@ -24,8 +24,8 @@ class LanguageConfig:
     pad_token_id: int = 0
 
     @classmethod
-    def from_dict(cls, params):
-        return cls(**{k: v for k, v in params.items() if k in inspect.signature(cls).parameters})
+    def from_dict(cls, params: dict):
+        return cls(**{k: v for k, v in params.items() if k in cls.__annotations__})
 
     def __post_init__(self):
         if self.num_key_value_heads is None:
@@ -33,15 +33,14 @@ class LanguageConfig:
 
 class LanguageBase(ABC):
     def __init__(self, config: LanguageConfig):
-        self.config = config
+        self.config = LanguageConfig.from_dict(config)
+        self.embed_tokens = nn.Embedding(self.config.vocab_size, self.config.hidden_size)
+        self.position_embedding = nn.Embedding(self.config.max_position_embeddings, self.config.hidden_size)
         
-        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size)
-        self.position_embedding = nn.Embedding(config.max_position_embeddings, config.hidden_size)
+        self.layers = [self._create_transformer_block() for _ in range(self.config.num_hidden_layers)]
         
-        self.layers = [self._create_transformer_block() for _ in range(config.num_hidden_layers)]
-        
-        self.norm = nn.RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
-        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
+        self.norm = nn.RMSNorm(self.config.hidden_size, eps=self.config.rms_norm_eps)
+        self.lm_head = nn.Linear(self.config.hidden_size, self.config.vocab_size, bias=False)
 
     def _create_transformer_block(self):
         return {

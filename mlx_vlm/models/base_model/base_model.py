@@ -1,13 +1,18 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Tuple, Dict, Any
+from pathlib import Path
+import glob
+import json
 
 import mlx.core as mx
 import mlx.nn as nn
 
 from .language_base import LanguageBase, LanguageConfig
+from .vision_base import VisionBase, VisionConfig
 from .model_interface import ModelInterface
 from ...core.error_handler import ErrorHandler
 from ...core.logger import Logger
+from ...core.config_manager import ConfigManager
 
 
 logger = Logger()
@@ -15,9 +20,11 @@ logger = Logger()
 class BaseModel(ModelInterface, ABC):
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
-        self.language_model = self._create_language_model(config['text_config'])
-        self.vision_model = self._create_vision_model(config['vision_config'])
-        self.multimodal_projector = self._create_multimodal_projector(config)
+        self.config['vision_config'] = {}
+        self.config['text_config'] = {}
+        self.config['vision_config'] = VisionConfig.from_dict(self.config['vision_config'])
+        self.config['text_config'] = LanguageConfig.from_dict(self.config['text_config'])
+        
 
     @abstractmethod
     def init_model_config(self):
@@ -25,15 +32,26 @@ class BaseModel(ModelInterface, ABC):
 
     @abstractmethod
     def _create_language_model(self, config: LanguageConfig) -> LanguageBase:
-        pass
+        return LanguageBase(self.config['text_config'])
+    
+    @abstractmethod
+    def _set_language_config(self):
+        raise NotImplementedError("Subclass must implement this method")
 
     @abstractmethod
-    def _create_vision_model(self, config: Dict[str, Any]) -> nn.Module:
-        pass
+    def _create_vision_model(self, config: VisionConfig) -> VisionBase:
+        return VisionBase(self.config['vision_config'])
+    
+    @abstractmethod
+    def _set_vision_config(self):
+        raise NotImplementedError("Subclass must implement this method")
+
 
     @abstractmethod
-    def _create_multimodal_projector(self, config: Dict[str, Any]) -> nn.Module:
-        pass
+    def _create_multimodal_projector(self) -> nn.Module:
+        # This method creates a multimodal projector that transforms the vision model's hidden states
+    # to match the text model's hidden size, enabling the integration of visual and textual features.
+        raise NotImplementedError("Subclass must implement this method")
 
     @abstractmethod
     def get_input_embeddings(
@@ -65,19 +83,28 @@ class BaseModel(ModelInterface, ABC):
             return {'logits': logits, 'cache': new_cache}
         except Exception as e:
             self.error_handler.handle_exception(e, "Error processing input in BaseModel")
-
-    def load_weights(self, weights: Dict[str, mx.array]) -> None:
-        try:
-            sanitized_weights = self.sanitize(weights)
-            self.load_weights(list(sanitized_weights.items()))
-        except Exception as e:
-            self.error_handler.handle_exception(e, "Error loading weights in BaseModel")
-
     @abstractmethod
     def sanitize(self, weights: Dict[str, mx.array]) -> Dict[str, mx.array]:
-        pass
+        raise NotImplementedError("Subclass must implement this method")
 
     @classmethod
     @abstractmethod
-    def from_pretrained(cls, path_or_hf_repo: str) -> 'BaseModel':
-        pass
+    def from_pretrained(cls, model_path: str) -> 'BaseModel':
+        config = ConfigManager(model_path).get_config()
+        model = cls(config)
+        weights = model._load_weights(model_path)
+        sanitized_weights = model.sanitize(weights)
+        model.load_weights(file_or_weights=sanitized_weights) 
+        return model
+
+    @staticmethod
+    def _load_weights(model_path: Path) -> Dict[str, mx.array]:
+        weight_files = glob.glob(str(model_path / "*.safetensors"))
+        if not weight_files:
+            raise FileNotFoundError(f"No safetensors found in {model_path}")
+
+        weights = {}
+        for wf in weight_files:
+            weights.update(mx.load(wf))
+        return weights
+        

@@ -15,8 +15,5 @@ class ModelInterface(nn.Module):
     def process(self):
         self.error_handler.handle_not_implemented_error("Subclasses must implement this method.")
 
-    def load_weights(self):
-        self.error_handler.handle_not_implemented_error("Subclasses must implement this method.")
-
     def get_input_embeddings(self):
         self.error_handler.handle_not_implemented_error("Subclasses must implement this method.")

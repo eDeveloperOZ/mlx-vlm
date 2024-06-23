@@ -9,51 +9,50 @@ import numpy as np
 
 @dataclass
 class VisionConfig:
-    model_type: str
-    num_hidden_layers: int
-    hidden_size: int
-    intermediate_size: int
-    num_attention_heads: int
-    image_size: int
-    patch_size: int
-    layer_norm_eps: float
+    model_type: str = "default"
+    num_hidden_layers: int = 12
+    hidden_size: int = 768
+    intermediate_size: int = 3072
+    num_attention_heads: int = 12
+    image_size: int = 224
+    patch_size: int = 16
+    layer_norm_eps: float = 1e-12
     num_channels: int = 3
     projection_dim: Optional[int] = None
     vocab_size: Optional[int] = None
 
     @classmethod
-    def from_dict(cls, params):
-        return cls(**{k: v for k, v in params.items() if k in inspect.signature(cls).parameters})
-
+    def from_dict(cls, params: dict):
+        return cls(**{k: v for k, v in params.items() if k in cls.__annotations__})
+    
 class VisionBase(ABC):
     def __init__(self, config: VisionConfig):
         self.config = config
-        
         self.patch_embedding = nn.Conv2d(
-            in_channels=config.num_channels,
-            out_channels=config.hidden_size,
-            kernel_size=config.patch_size,
-            stride=config.patch_size,
+            in_channels=self.config['num_channels'],
+            out_channels=self.config['hidden_size'],
+            kernel_size=self.config['patch_size'],
+            stride=self.config['patch_size'],
         )
-        self.num_patches = (config.image_size // config.patch_size) ** 2
-        self.position_embedding = nn.Embedding(self.num_patches + 1, config.hidden_size)
-        self.class_embedding = mx.zeros((config.hidden_size,))
+        self.num_patches = (self.config['image_size'] // self.config['patch_size']) ** 2
+        self.position_embedding = nn.Embedding(self.num_patches + 1, self.config['hidden_size'])
+        self.class_embedding = mx.zeros((self.config['hidden_size'],))
         
-        self.encoder_layers = [self._create_encoder_layer() for _ in range(config.num_hidden_layers)]
+        self.encoder_layers = [self._create_encoder_layer() for _ in range(self.config['num_hidden_layers'])]
         
-        self.post_layernorm = nn.LayerNorm(config.hidden_size)
+        self.post_layernorm = nn.LayerNorm(self.config['hidden_size'])
 
     def _create_encoder_layer(self):
         return {
             'self_attn': self._create_attention(),
-            'layer_norm1': nn.LayerNorm(self.config.hidden_size, eps=self.config.layer_norm_eps),
+            'layer_norm1': nn.LayerNorm(self.config['hidden_size'], eps=self.config['layer_norm_eps']),
             'mlp': self._create_mlp(),
-            'layer_norm2': nn.LayerNorm(self.config.hidden_size, eps=self.config.layer_norm_eps)
+            'layer_norm2': nn.LayerNorm(self.config['hidden_size'], eps=self.config['layer_norm_eps'])
         }
 
     def _create_attention(self):
-        dims = self.config.hidden_size
-        num_heads = self.config.num_attention_heads
+        dims = self.config['hidden_size']
+        num_heads = self.config['num_attention_heads']
         return {
             'num_heads': num_heads,
             'scale': (dims // num_heads) ** -0.5,
@@ -66,8 +65,8 @@ class VisionBase(ABC):
     def _create_mlp(self):
         return {
             'activation_fn': nn.GELU(approx="fast"),
-            'fc1': nn.Linear(self.config.hidden_size, self.config.intermediate_size),
-            'fc2': nn.Linear(self.config.intermediate_size, self.config.hidden_size)
+            'fc1': nn.Linear(self.config['hidden_size'], self.config['intermediate_size']),
+            'fc2': nn.Linear(self.config['intermediate_size'], self.config['hidden_size'])
         }
 
     def __call__(self, x: mx.array, output_hidden_states: Optional[bool] = None) -> mx.array:

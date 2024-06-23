@@ -7,45 +7,45 @@ import requests
 import mlx.core as mx
 
 def parse_arguments():
-    print(f'I AM PARSING ARGUMENTS')
     parser = argparse.ArgumentParser(description="MLX Vision Language Model")
     
-    # Common arguments
-    parser.add_argument("--model", type=str, default="qnguyen3/nanoLLaVA",
-                        help="The path to the local model directory or Hugging Face repo.")
-    parser.add_argument("--image", type=str,
-                        default="http://images.cocodataset.org/val2017/000000039769.jpg",
-                        help="URL or path of the image to process.")
-    parser.add_argument("--prompt", type=str, default="What are these?",
-                        help="Message to be processed by the model.")
-    parser.add_argument("-e", "--engine", type=str, choices=["single", "batch", "video"],
-                        default="single",
-                        help="The engine to use for processing the input, single(default), batch or video")
-    parser.add_argument("--max-tokens", type=int, default=100,
-                        help="Maximum number of tokens to generate.")
-    parser.add_argument("--temp", type=float, default=0.3,
-                        help="Temperature for sampling.")
-    parser.add_argument("--verbose", action="store_true",
-                        help="Detailed output.")
-    
     # Add a subparser for different modes
-    subparsers = parser.add_subparsers(dest="mode", help="Operation mode")
+    subparsers = parser.add_subparsers(dest="mode", help="Operation mode", required=True)
+    
+    # Common arguments function
+    def add_common_arguments(parser):
+        parser.add_argument("--model", type=str, default="qnguyen3/nanoLLaVA",
+                            help="The path to the local model directory or Hugging Face repo.")
+        parser.add_argument("--image", type=str,
+                            default="http://images.cocodataset.org/val2017/000000039769.jpg",
+                            help="URL or path of the image to process.")
+        parser.add_argument("--prompt", type=str, default="What are these?",
+                            help="Message to be processed by the model.")
+        parser.add_argument("-e", "--engine", type=str, choices=["single", "batch", "video"],
+                            default="single",
+                            help="The engine to use for processing the input, single(default), batch or video")
+        parser.add_argument("--max-tokens", type=int, default=100,
+                            help="Maximum number of tokens to generate.")
+        parser.add_argument("--temp", type=float, default=0.3,
+                            help="Temperature for sampling.")
+        parser.add_argument("--verbose", action="store_true",
+                            help="Detailed output.")
     
     # CLI mode
     cli_parser = subparsers.add_parser("cli", help="Run in CLI mode")
+    add_common_arguments(cli_parser)
     
     # Chat UI mode
     chat_parser = subparsers.add_parser("chat", help="Run in Chat UI mode")
+    add_common_arguments(chat_parser)
     
     # Generate mode
     generate_parser = subparsers.add_parser("generate", help="Run in Generate mode")
+    add_common_arguments(generate_parser)
     
-    args = parser.parse_args()
-    
-    if args.mode is None:
-        parser.error("You must specify a mode: cli, chat, or generate")
-    
-    return args
+    parsed_args = parser.parse_args()
+        
+    return parsed_args
 
 def load_image(image_source: Union[str, Path, BytesIO]):
     """

@@ -7,8 +7,8 @@ class Logger:
 
     def error(self, message: str):
         print(f"ERROR: {message}")
-        print("exiting...")
-        exit(1)
+        # print("exiting...")
+        # exit(1)
 
     def debug(self, message: str):
         print(f"DEBUG: {message}")
