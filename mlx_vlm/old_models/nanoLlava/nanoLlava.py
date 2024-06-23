@@ -238,6 +238,7 @@ class Model(nn.Module):
         return model
 
     def sanitize(self, weights):
+        print(f'weights.length before: {len(weights)}')
         weights = {
             (
                 f"{k.split('.', 1)[1]}"
@@ -282,4 +283,5 @@ class Model(nn.Module):
             for k, v in weights.items()
         }
 
+        print(f'weights.length after: {len(weights)}')
         return weights

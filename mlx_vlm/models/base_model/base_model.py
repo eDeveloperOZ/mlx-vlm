@@ -89,16 +89,28 @@ class BaseModel(ModelInterface, ABC):
 
     @classmethod
     @abstractmethod
-    def from_pretrained(cls, model_path: str) -> 'BaseModel':
+    def from_pretrained(self, model_path: str) -> 'BaseModel':
         config = ConfigManager(model_path).get_config()
-        model = cls(config)
+        model = self(config)
         weights = model._load_weights(model_path)
         sanitized_weights = model.sanitize(weights)
-        model.load_weights(file_or_weights=sanitized_weights) 
-        return model
+
+        if (quantization := config.get('quantization', None)) is not None:
+            self.class_predicate =  (
+             lambda p, m: isinstance(m,  (nn.Linear, nn.Embedding))
+             and f"{p}.scales" in weights
+            )
+            nn.quantize(
+                model=model,
+                **quantization,
+                class_predicate=self.class_predicate
+            )
+        model.load_weights(file_or_weights=list(sanitized_weights.items())) 
+        return model.eval()
 
     @staticmethod
     def _load_weights(model_path: Path) -> Dict[str, mx.array]:
+        print(f'model_path: {model_path}')
         weight_files = glob.glob(str(model_path / "*.safetensors"))
         if not weight_files:
             raise FileNotFoundError(f"No safetensors found in {model_path}")

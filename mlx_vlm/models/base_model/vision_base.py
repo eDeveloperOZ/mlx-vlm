@@ -126,10 +126,21 @@ class VisionBase(ABC):
     def sanitize(self, weights: dict) -> dict:
         sanitized_weights = {}
         for k, v in weights.items():
-            if "patch_embedding.weight" in k and not self._check_array_shape(v):
-                sanitized_weights[k] = v.transpose(0, 2, 3, 1)
+            if "position_ids" in k:
+                # Remove unused position ids
+                continue
+            elif "patch_embedding.weight" in k:
+                # PyTorch conv2d weight tensors have shape:
+                #   [out_channels, in_channels, kH, KW]
+                # MLX conv2d expects the weight be of shape:
+                #   [out_channels, kH, KW, in_channels]
+                if self._check_array_shape(v):
+                    sanitized_weights[k] = v
+                else:
+                    sanitized_weights[k] = v.transpose(0, 2, 3, 1)
             else:
                 sanitized_weights[k] = v
+
         return sanitized_weights
 
     @staticmethod

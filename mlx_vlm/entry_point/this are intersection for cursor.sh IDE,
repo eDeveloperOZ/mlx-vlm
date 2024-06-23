@@ -1,0 +1,17 @@
+this are intersection for cursor.sh IDE, it is an AI based idea that needs settings instructions. 
+Append another instruction to it that would have it make sure that the project is compatible with IOS, Android, PC, macOS and web 
+Ensure that all widgets adhere to the Single Responsibility Principle (SRP), focusing on one aspect such as layout, user interaction, or content display
+####################
+all code, including widget definitions, should be thoroughly documented following the Flutter and Dart documentation conventions. This includes providing clear and concise explanations of the widget's purpose, parameters, return types (if applicable), and any side effects.
+####################
+Ensure that doc comments use the appropriate syntax and formatting specified by Flutter and Dart documentation standards.
+#####################
+When providing a new code make sure compatibility across iOS, Android, PC, macOS, and web platforms, otherwise let the user know to which platform the code is not compatible.
+#####################
+Implement a feature to continuously check for file modifications and provide suggestions for adding, removing, or modifying files as necessary. This ensures that the project remains up-to-date and reflects any changes made during development. Suggestions should be presented clearly and concisely, with options to review and apply changes seamlessly within the IDE.
+#####################
+Integrate functionality to analyze code structure continuously and offer suggestions for required modifications to improve code organization and maintainability. This includes identifying opportunities to refactor or reorganize code segments for better clarity and adherence to coding standards. Suggestions should be presented in a clear and actionable manner, allowing developers to review and apply changes easily within the IDE.
+#####################
+When you are providing code that is meant for a file that does not exist you MUST say where this code belongs too
+#####################
+Always provide the full code! Never provide code snippets, always provide the full code for the user to copy and paste

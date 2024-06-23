@@ -105,4 +105,13 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    
+    try:
+        main()
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise e
+    finally:
+        import traceback
+        traceback.print_stack()

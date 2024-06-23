@@ -160,30 +160,14 @@ class NanoLlava(BaseModel):
             weights["language_model.model.lm_head.weight"] = weights[
                 "language_model.model.embed_tokens.weight"
             ]
-        return weights
+        return self.language.sanitize(weights)
 
     def _sanitize_vision_weights(self, weights):
-        sanitized_weights = {}
-        for k, v in weights.items():
-            if "patch_embedding.weight" in k:
-                if len(v.shape) == 4 and v.shape[0] >= v.shape[1] and v.shape[1] == v.shape[2]:
-                    sanitized_weights[k] = v
-                else:
-                    sanitized_weights[k] = v.transpose(0, 2, 3, 1)
-            else:
-                sanitized_weights[k] = v
-        return sanitized_weights
+        return self.vision.sanitize(weights)
 
     def sanitize(self, weights):
-        print(f'weights.length before: {len(weights)}')
-        
-        # Initial filtering
-        weights = {
-            k: v for k, v in weights.items()
-            if not any(excluded in k for excluded in ['rotary_emb.inv_freq', 'position_ids'])
-        }
-        
-        # Remapping keys
+
+
         weights = {
             (
                 f"{k.split('.', 1)[1]}"
@@ -209,9 +193,25 @@ class NanoLlava(BaseModel):
             for k, v in weights.items()
         }
 
-        # Apply specific sanitization methods
-        weights = self._sanitize_language_weights(weights)
+        weights = {
+            (
+                f"vision_tower.vision_tower.vision_model.head.attention.in_proj.bias"
+                if re.match(
+                    r"^vision_tower\.vision_tower\.vision_model\.head\.attention\.in_proj_bias",
+                    k,
+                )
+                else (
+                    f"vision_tower.vision_tower.vision_model.head.attention.in_proj.weight"
+                    if re.match(
+                        r"^vision_tower\.vision_tower\.vision_model\.head\.attention\.in_proj_weight",
+                        k,
+                    )
+                    else k
+                )
+            ): v
+            for k, v in weights.items()
+        }
         weights = self._sanitize_vision_weights(weights)
-
-        print(f'weights.length after: {len(weights)}')
+        weights = self._sanitize_language_weights(weights)
+        
         return weights

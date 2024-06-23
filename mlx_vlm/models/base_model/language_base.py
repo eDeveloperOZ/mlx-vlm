@@ -158,7 +158,9 @@ class LanguageBase(ABC):
         return mlp['down_proj'](nn.silu(mlp['gate_proj'](x)) * mlp['up_proj'](x))
 
     def sanitize(self, weights):
-        return {k: v for k, v in weights.items() if "rotary_emb.inv_freq" not in k}
+        return {
+            k: v for k, v in weights.items() if "self_attn.rotary_emb.inv_freq" not in k
+        }
 
     @staticmethod
     def from_dict(params: dict) -> 'LanguageBase':

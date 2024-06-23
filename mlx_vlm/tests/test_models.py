@@ -71,7 +71,7 @@ class TestModels(unittest.TestCase):
         )
 
     def test_nanoLlava(self):
-        from mlx_vlm.models import nanoLlava
+        from mlx_vlm.old_models import nanoLlava
 
         text_config = nanoLlava.TextConfig(
             model_type="qwen2",
@@ -142,7 +142,7 @@ class TestModels(unittest.TestCase):
         )
 
     def test_llava(self):
-        from mlx_vlm.models import llava
+        from mlx_vlm.old_models import llava
 
         text_config = llava.TextConfig(
             model_type="llama",
@@ -207,7 +207,7 @@ class TestModels(unittest.TestCase):
         )
 
     def test_idefics2(self):
-        from mlx_vlm.models import idefics2
+        from mlx_vlm.old_models import idefics2
 
         text_config = idefics2.TextConfig(
             model_type="mistral",
@@ -270,7 +270,7 @@ class TestModels(unittest.TestCase):
         )
 
     def test_paligemma(self):
-        from mlx_vlm.models import paligemma
+        from mlx_vlm.old_models import paligemma
 
         text_config = paligemma.TextConfig(
             model_type="gemma",
@@ -332,7 +332,7 @@ class TestModels(unittest.TestCase):
         )
 
     def test_multi_modality(self):
-        from mlx_vlm.models import multi_modality
+        from mlx_vlm.old_models import multi_modality
 
         text_config = multi_modality.TextConfig(
             model_type="llama",
