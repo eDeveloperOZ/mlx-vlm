@@ -4,7 +4,7 @@ from PIL import Image
 import mlx.nn as nn
 from typing import Optional, Callable
 import mlx.core as mx
-from transformers import PreTrainedTokenizer
+from transformers import PreTrainedTokenizer, AutoProcessor
 import time
 
 from .base_image_processor import BaseImageProcessor, expand2square
@@ -16,7 +16,6 @@ logger = Logger()
 class SingleImageMediaEngine(BaseImageProcessor):
     def __init__(self, model_path: str):
         super().__init__(model_path)
-        # self.image_size = image_size
 
     def generate(
         self,

@@ -4,7 +4,7 @@ from PIL import Image
 from transformers import PreTrainedTokenizer, PreTrainedTokenizerFast
 from transformers.image_processing_utils import get_size_dict
 from transformers.image_utils import ChannelDimension, PILImageResampling, load_image
-from transformers import AutoImageProcessor
+from transformers import AutoProcessor
 import mlx.nn as nn
 import mlx.core as mx
 import numpy as np
@@ -56,7 +56,7 @@ class BaseImageProcessor(MediaEngineInterface, ABC):
     
     def init_engine(self, model_path: str)-> Union[PreTrainedTokenizer, PreTrainedTokenizerFast]:
         self.engine_config = {"trust_remote_code": True}
-        self.processor = AutoImageProcessor.from_pretrained(model_path, **self.engine_config)
+        self.processor = AutoProcessor.from_pretrained(model_path, **self.engine_config)
         detokenizer_class = load_tokenizer(model_path, return_tokenizer=False)
         if "tokenizer" in self.processor.__dict__.keys():
             self.processor.detokenizer = detokenizer_class(self.processor.tokenizer)

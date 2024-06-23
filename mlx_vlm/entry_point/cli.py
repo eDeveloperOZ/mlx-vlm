@@ -49,7 +49,8 @@ class CLI(EntryPointInterface):
 
         # Use the processor from the engine
         processor = self.engine.processor
-
+        
+        # TODO: Check if this is the correct way to do it. might not needed
         if "chat_template" in processor.__dict__.keys():
             prompt = processor.apply_chat_template(
                 [get_message_json(self.model.config.model_type, prompt)],
@@ -70,7 +71,7 @@ class CLI(EntryPointInterface):
 
         output = self.engine.generate(
             self.model,
-            self.engine.processor,  # Pass the processor here
+            self.engine.processor,
             image,
             prompt,
             temp=self.args.temp,
@@ -78,4 +79,4 @@ class CLI(EntryPointInterface):
             verbose=self.args.verbose
         )
 
-        print("Model Output:", output)
+        print("Model Output:\n", output)

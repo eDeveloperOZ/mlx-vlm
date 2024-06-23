@@ -101,8 +101,9 @@ class NanoLlava(BaseModel):
             output_hidden_states=True
         )
 
-        selected_image_feature = hidden_states[-2]
-        selected_image_feature = selected_image_feature[:, 1:]
+        selected_image_feature = hidden_states[-1].astype(pixel_values.dtype)
+        assert selected_image_feature.shape[-2] == 729
+
 
         image_features = self.multimodal_projector(selected_image_feature)
 
@@ -213,5 +214,5 @@ class NanoLlava(BaseModel):
         }
         weights = self._sanitize_vision_weights(weights)
         weights = self._sanitize_language_weights(weights)
-        
+
         return weights
